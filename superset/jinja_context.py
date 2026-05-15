@@ -288,7 +288,14 @@ class ExtraCache:
         from superset.views.utils import get_form_data
 
         if has_request_context() and request.args.get(param):
-            return request.args.get(param, default)
+            result = request.args.get(param, default)
+            if result and escape_result and self.dialect:
+                result = String().literal_processor(dialect=self.dialect)(value=result)[
+                    1:-1
+                ]
+            if add_to_cache_keys:
+                self.cache_key_wrapper(result)
+            return result
 
         form_data, _ = get_form_data()
         url_params = form_data.get("url_params") or {}
