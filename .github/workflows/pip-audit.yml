@@ -39,36 +39,25 @@ jobs:
   pip-audit:
     runs-on: ubuntu-24.04
     steps:
-      - name: "Checkout Repository"
+      - name: "Checkout ${{ github.ref }} ( ${{ github.sha }} )"
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           persist-credentials: false
 
       - name: Check for file changes
         id: check
-        if: github.event_name == 'pull_request'
         uses: ./.github/actions/change-detector/
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Python
-        if: github.event_name != 'pull_request' || steps.check.outputs.python
+        if: steps.check.outputs.python
         uses: ./.github/actions/setup-backend/
         with:
           requirements-type: base
 
-      - name: Install pip-audit
-        if: github.event_name != 'pull_request' || steps.check.outputs.python
-        run: uv pip install --system pip-audit
-
       - name: Run pip-audit
-        if: github.event_name != 'pull_request' || steps.check.outputs.python
-        run: pip-audit -r requirements/base.txt --desc --output pip-audit-results.txt || true
-
-      - name: Display audit results
-        if: github.event_name != 'pull_request' || steps.check.outputs.python
-        run: cat pip-audit-results.txt
-
-      - name: Check for vulnerabilities
-        if: github.event_name != 'pull_request' || steps.check.outputs.python
-        run: pip-audit -r requirements/base.txt --strict
+        if: steps.check.outputs.python
+        run: |
+          uv pip install --system pip-audit
+          pip-audit -r requirements/base.txt --strict --desc
