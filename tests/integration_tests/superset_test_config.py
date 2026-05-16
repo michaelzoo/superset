@@ -128,6 +128,12 @@ EXPLORE_FORM_DATA_CACHE_CONFIG = {
 
 GLOBAL_ASYNC_QUERIES_JWT_SECRET = "test-secret-change-me-test-secret-change-me"  # noqa: S105
 
+# Provide a valid JWT secret for guest token integration tests.
+# Uses the known insecure constant so tests can encode/decode tokens.
+from superset.constants import INSECURE_GUEST_TOKEN_JWT_SECRET  # noqa: E402
+
+GUEST_TOKEN_JWT_SECRET = INSECURE_GUEST_TOKEN_JWT_SECRET
+
 ALERT_REPORTS_WORKING_TIME_OUT_KILL = True
 
 ALERT_REPORTS_QUERY_EXECUTION_MAX_TRIES = 3
