@@ -667,9 +667,8 @@ class SupersetAppInitializer:  # pylint: disable=too-many-public-methods
         """Reject the known insecure GUEST_TOKEN_JWT_SECRET when
         the EMBEDDED_SUPERSET feature flag is enabled."""
         secret = self.config.get("GUEST_TOKEN_JWT_SECRET")
-        embedded_enabled = (
-            self.config.get("DEFAULT_FEATURE_FLAGS", {})
-            .get("EMBEDDED_SUPERSET", False)
+        embedded_enabled = self.config.get("DEFAULT_FEATURE_FLAGS", {}).get(
+            "EMBEDDED_SUPERSET", False
         )
 
         if not embedded_enabled:
