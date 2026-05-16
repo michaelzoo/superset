@@ -36,11 +36,13 @@ def _make_initializer() -> SupersetAppInitializer:
     return initializer
 
 
+@patch("superset.initialization.is_test", return_value=False)
 @patch("superset.initialization.async_query_manager_factory")
 @patch("superset.initialization.feature_flag_manager")
 def test_default_jwt_secret_rejected_in_production(
     mock_ff: MagicMock,
     mock_aqm: MagicMock,
+    mock_is_test: MagicMock,
 ) -> None:
     """Startup must abort when the default JWT secret is used in production."""
     initializer = _make_initializer()
