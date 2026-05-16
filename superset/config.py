@@ -2318,7 +2318,9 @@ GLOBAL_ASYNC_QUERIES_JWT_COOKIE_SAMESITE: None | (Literal["None", "Lax", "Strict
     None
 )
 GLOBAL_ASYNC_QUERIES_JWT_COOKIE_DOMAIN = None
-GLOBAL_ASYNC_QUERIES_JWT_SECRET = "test-secret-change-me"  # noqa: S105
+GLOBAL_ASYNC_QUERIES_JWT_SECRET = os.environ.get(  # noqa: S105
+    "GLOBAL_ASYNC_QUERIES_JWT_SECRET", "test-secret-change-me"
+)
 GLOBAL_ASYNC_QUERIES_TRANSPORT: Literal["polling", "ws"] = "polling"
 GLOBAL_ASYNC_QUERIES_POLLING_DELAY = int(
     timedelta(milliseconds=500).total_seconds() * 1000
