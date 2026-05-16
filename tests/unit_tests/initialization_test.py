@@ -190,6 +190,114 @@ class TestSupersetAppInitializer:
         )
 
 
+class TestCheckGuestTokenSecret:
+    def test_insecure_default_with_embedded_enabled_exits(self):
+        """Startup must reject the known insecure GUEST_TOKEN_JWT_SECRET
+        when EMBEDDED_SUPERSET is enabled in a non-debug/non-test context."""
+        mock_app = MagicMock()
+        mock_app.debug = False
+        mock_app.config = {
+            "TESTING": False,
+            "GUEST_TOKEN_JWT_SECRET": "test-guest-secret-change-me",
+            "DEFAULT_FEATURE_FLAGS": {"EMBEDDED_SUPERSET": True},
+        }
+        app_initializer = SupersetAppInitializer(mock_app)
+
+        with (
+            patch("superset.initialization.is_test", return_value=False),
+            patch("superset.initialization.sys.exit") as mock_exit,
+        ):
+            app_initializer.check_guest_token_secret()
+
+        mock_exit.assert_called_once_with(1)
+
+    def test_none_secret_with_embedded_enabled_exits(self):
+        """Startup must reject a None GUEST_TOKEN_JWT_SECRET
+        when EMBEDDED_SUPERSET is enabled."""
+        mock_app = MagicMock()
+        mock_app.debug = False
+        mock_app.config = {
+            "TESTING": False,
+            "GUEST_TOKEN_JWT_SECRET": None,
+            "DEFAULT_FEATURE_FLAGS": {"EMBEDDED_SUPERSET": True},
+        }
+        app_initializer = SupersetAppInitializer(mock_app)
+
+        with (
+            patch("superset.initialization.is_test", return_value=False),
+            patch("superset.initialization.sys.exit") as mock_exit,
+        ):
+            app_initializer.check_guest_token_secret()
+
+        mock_exit.assert_called_once_with(1)
+
+    def test_secure_secret_with_embedded_enabled_passes(self):
+        """Startup must allow a properly configured secret."""
+        mock_app = MagicMock()
+        mock_app.debug = False
+        mock_app.config = {
+            "TESTING": False,
+            "GUEST_TOKEN_JWT_SECRET": "my-strong-random-secret-value",
+            "DEFAULT_FEATURE_FLAGS": {"EMBEDDED_SUPERSET": True},
+        }
+        app_initializer = SupersetAppInitializer(mock_app)
+
+        with (
+            patch("superset.initialization.is_test", return_value=False),
+            patch("superset.initialization.sys.exit") as mock_exit,
+        ):
+            app_initializer.check_guest_token_secret()
+
+        mock_exit.assert_not_called()
+
+    def test_insecure_secret_with_embedded_disabled_passes(self):
+        """No check is needed when EMBEDDED_SUPERSET is disabled."""
+        mock_app = MagicMock()
+        mock_app.debug = False
+        mock_app.config = {
+            "TESTING": False,
+            "GUEST_TOKEN_JWT_SECRET": "test-guest-secret-change-me",
+            "DEFAULT_FEATURE_FLAGS": {"EMBEDDED_SUPERSET": False},
+        }
+        app_initializer = SupersetAppInitializer(mock_app)
+
+        with (
+            patch("superset.initialization.is_test", return_value=False),
+            patch("superset.initialization.sys.exit") as mock_exit,
+        ):
+            app_initializer.check_guest_token_secret()
+
+        mock_exit.assert_not_called()
+
+    def test_insecure_secret_in_test_mode_does_not_exit(self):
+        """In test/debug mode the check should log but not exit."""
+        mock_app = MagicMock()
+        mock_app.debug = True
+        mock_app.config = {
+            "TESTING": True,
+            "GUEST_TOKEN_JWT_SECRET": "test-guest-secret-change-me",
+            "DEFAULT_FEATURE_FLAGS": {"EMBEDDED_SUPERSET": True},
+        }
+        app_initializer = SupersetAppInitializer(mock_app)
+
+        with (
+            patch("superset.initialization.is_test", return_value=True),
+            patch("superset.initialization.sys.exit") as mock_exit,
+        ):
+            app_initializer.check_guest_token_secret()
+
+        mock_exit.assert_not_called()
+
+    def test_config_default_reads_from_env(self):
+        """GUEST_TOKEN_JWT_SECRET should read from env var by default."""
+        with patch.dict(os.environ, {"GUEST_TOKEN_JWT_SECRET": "from-env"}):
+            assert os.environ.get("GUEST_TOKEN_JWT_SECRET") == "from-env"
+
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("GUEST_TOKEN_JWT_SECRET", None)
+            assert os.environ.get("GUEST_TOKEN_JWT_SECRET") is None
+
+
 class TestCreateAppRoot:
     """Test app root resolution precedence in create_app."""
 
