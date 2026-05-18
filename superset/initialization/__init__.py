@@ -655,17 +655,24 @@ class SupersetAppInitializer:  # pylint: disable=too-many-public-methods
             logger.warning(bottom_banner)
 
         if self.config["SECRET_KEY"] == CHANGE_ME_SECRET_KEY:
-            if (
-                self.superset_app.debug
-                or self.superset_app.config["TESTING"]
-                or is_test()
-            ):
-                logger.warning("Debug mode identified with default secret key")
+            is_production = (
+                os.environ.get("SUPERSET_ENV") == "production"
+                or not self.superset_app.debug
+            )
+            is_dev_or_test = self.superset_app.config["TESTING"] or is_test()
+            if is_production or not is_dev_or_test:
                 log_default_secret_key_warning()
-                return
+                logger.error("Refusing to start due to insecure SECRET_KEY")
+                raise SystemExit(
+                    "ERROR: Default SECRET_KEY detected. Superset refuses to start "
+                    "with the well-known default 'CHANGE_ME_TO_A_COMPLEX_RANDOM_SECRET'"
+                    " value because it is publicly known and makes all cryptographic "
+                    "operations insecure. Set the SUPERSET_SECRET_KEY environment "
+                    "variable or override SECRET_KEY in superset_config.py. "
+                    "Generate one with: openssl rand -base64 42"
+                )
+            logger.warning("Debug/test mode identified with default secret key")
             log_default_secret_key_warning()
-            logger.error("Refusing to start due to insecure SECRET_KEY")
-            sys.exit(1)
 
     def check_guest_token_secret(self) -> None:
         """Reject the known insecure GUEST_TOKEN_JWT_SECRET when
