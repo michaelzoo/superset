@@ -18,9 +18,11 @@
 import os
 from unittest.mock import MagicMock, patch
 
+import pytest
 from sqlalchemy.exc import OperationalError
 
 from superset.app import AppRootMiddleware, create_app, SupersetApp
+from superset.constants import CHANGE_ME_SECRET_KEY
 from superset.initialization import SupersetAppInitializer
 
 
@@ -188,6 +190,77 @@ class TestSupersetAppInitializer:
             app_initializer._db_uri_cache
             == "postgresql://realuser:realpass@realhost:5432/realdb"
         )
+
+
+class TestCheckSecretKey:
+    def test_default_secret_key_rejected_in_production(self):
+        """Startup must raise SystemExit when SECRET_KEY is the well-known
+        default and the environment is production (DEBUG=False)."""
+        mock_app = MagicMock()
+        mock_app.debug = False
+        mock_app.config = {
+            "SECRET_KEY": CHANGE_ME_SECRET_KEY,
+            "TESTING": False,
+        }
+        app_initializer = SupersetAppInitializer(mock_app)
+        env = os.environ.copy()
+        env.pop("SUPERSET_ENV", None)
+
+        with (
+            patch("superset.initialization.is_test", return_value=False),
+            patch.dict(os.environ, env, clear=True),
+            pytest.raises(SystemExit, match="Default SECRET_KEY detected"),
+        ):
+            app_initializer.check_secret_key()
+
+    def test_default_secret_key_rejected_when_superset_env_production(self):
+        """Startup must raise SystemExit when SUPERSET_ENV=production,
+        even if debug=True."""
+        mock_app = MagicMock()
+        mock_app.debug = True
+        mock_app.config = {
+            "SECRET_KEY": CHANGE_ME_SECRET_KEY,
+            "TESTING": False,
+        }
+        app_initializer = SupersetAppInitializer(mock_app)
+
+        with (
+            patch("superset.initialization.is_test", return_value=False),
+            patch.dict(os.environ, {"SUPERSET_ENV": "production"}),
+            pytest.raises(SystemExit, match="Default SECRET_KEY detected"),
+        ):
+            app_initializer.check_secret_key()
+
+    def test_default_secret_key_allowed_in_debug_and_test(self):
+        """In debug+test mode, a warning is logged but startup proceeds."""
+        mock_app = MagicMock()
+        mock_app.debug = True
+        mock_app.config = {
+            "SECRET_KEY": CHANGE_ME_SECRET_KEY,
+            "TESTING": True,
+        }
+        app_initializer = SupersetAppInitializer(mock_app)
+        env = os.environ.copy()
+        env.pop("SUPERSET_ENV", None)
+
+        with (
+            patch("superset.initialization.is_test", return_value=True),
+            patch.dict(os.environ, env, clear=True),
+        ):
+            app_initializer.check_secret_key()
+
+    def test_custom_secret_key_always_passes(self):
+        """A properly configured SECRET_KEY should never trigger rejection."""
+        mock_app = MagicMock()
+        mock_app.debug = False
+        mock_app.config = {
+            "SECRET_KEY": "my-strong-random-secret-value",
+            "TESTING": False,
+        }
+        app_initializer = SupersetAppInitializer(mock_app)
+
+        with patch("superset.initialization.is_test", return_value=False):
+            app_initializer.check_secret_key()
 
 
 class TestCheckGuestTokenSecret:
