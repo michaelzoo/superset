@@ -37,7 +37,11 @@ from flask_compress import Compress
 from flask_session import Session
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-from superset.constants import CHANGE_ME_SECRET_KEY, INSECURE_GUEST_TOKEN_JWT_SECRET
+from superset.constants import (
+    CHANGE_ME_GAQ_JWT_SECRET,
+    CHANGE_ME_SECRET_KEY,
+    INSECURE_GUEST_TOKEN_JWT_SECRET,
+)
 from superset.databases.utils import make_url_safe
 from superset.extensions import (
     _event_logger,
@@ -984,6 +988,27 @@ class SupersetAppInitializer:  # pylint: disable=too-many-public-methods
 
     def configure_async_queries(self) -> None:
         if feature_flag_manager.is_feature_enabled("GLOBAL_ASYNC_QUERIES"):
+            jwt_secret = self.config["GLOBAL_ASYNC_QUERIES_JWT_SECRET"]
+            if jwt_secret == CHANGE_ME_GAQ_JWT_SECRET:
+                if (
+                    self.superset_app.debug
+                    or self.superset_app.config["TESTING"]
+                    or is_test()
+                ):
+                    logger.warning(
+                        "GLOBAL_ASYNC_QUERIES is enabled with the default "
+                        "JWT secret. Set GLOBAL_ASYNC_QUERIES_JWT_SECRET "
+                        "via environment variable or superset_config.py."
+                    )
+                else:
+                    logger.error(
+                        "Refusing to start: GLOBAL_ASYNC_QUERIES is enabled "
+                        "but GLOBAL_ASYNC_QUERIES_JWT_SECRET is set to the "
+                        "known default value. Please set a secure, random "
+                        "secret via the GLOBAL_ASYNC_QUERIES_JWT_SECRET "
+                        "environment variable or in superset_config.py."
+                    )
+                    sys.exit(1)
             async_query_manager_factory.init_app(self.superset_app)
 
     def configure_task_manager(self) -> None:
