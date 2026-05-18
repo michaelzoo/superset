@@ -28,6 +28,7 @@ NULL_STRING = "<NULL>"
 EMPTY_STRING = "<empty string>"
 
 CHANGE_ME_SECRET_KEY = "CHANGE_ME_TO_A_COMPLEX_RANDOM_SECRET"  # noqa: S105
+INSECURE_GUEST_TOKEN_JWT_SECRET = "test-guest-secret-change-me"  # noqa: S105
 CHANGE_ME_GAQ_JWT_SECRET = "test-secret-change-me"  # noqa: S105
 
 # UUID for the examples database
