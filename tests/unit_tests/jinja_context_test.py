@@ -415,6 +415,26 @@ def test_url_param_escaped_default_form_data() -> None:
         assert cache.url_param("bar", "O'Malley") == "O''Malley"
 
 
+def test_url_param_escaped_request_args() -> None:
+    """
+    Test that ``url_param`` escapes values from ``request.args`` when
+    ``escape_result=True`` and a dialect is provided, preventing SQL injection.
+    """
+    with current_app.test_request_context(query_string={"foo": "O'Brien"}):
+        cache = ExtraCache(dialect=dialect())
+        assert cache.url_param("foo") == "O''Brien"
+
+
+def test_url_param_unescaped_request_args() -> None:
+    """
+    Test that ``url_param`` does NOT escape values from ``request.args``
+    when ``escape_result=False``.
+    """
+    with current_app.test_request_context(query_string={"foo": "O'Brien"}):
+        cache = ExtraCache(dialect=dialect())
+        assert cache.url_param("foo", escape_result=False) == "O'Brien"
+
+
 def test_url_param_unescaped_form_data() -> None:
     """
     Test the ``url_param`` with ``url_params`` in ``form_data`` returning
