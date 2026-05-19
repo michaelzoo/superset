@@ -626,6 +626,22 @@ class SupersetSecurityManager(  # pylint: disable=too-many-public-methods
     guest_user_cls = GuestUser
     pyjwt_for_guest_token = _jwt_global_obj
 
+    UNSAFE_DEFAULT_SECRET = "test-guest-secret-change-me"  # noqa: S105
+
+    def __init__(self, appbuilder: Any) -> None:
+        super().__init__(appbuilder)
+        from superset.extensions import feature_flag_manager
+
+        if (
+            feature_flag_manager.is_feature_enabled("EMBEDDED_SUPERSET")
+            and get_conf().get("GUEST_TOKEN_JWT_SECRET") == self.UNSAFE_DEFAULT_SECRET
+        ):
+            raise ValueError(
+                "GUEST_TOKEN_JWT_SECRET must be changed from the default value "
+                "when the EMBEDDED_SUPERSET feature flag is enabled. "
+                "Set a unique, random secret in your Superset configuration."
+            )
+
     def create_login_manager(self, app: Flask) -> LoginManager:
         lm = super().create_login_manager(app)
         lm.request_loader(self.request_loader)

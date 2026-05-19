@@ -1547,3 +1547,60 @@ def test_validate_child_in_parent_multilayer_null_params(
     assert not sm._validate_child_in_parent_multilayer(
         child_slice_id=1, parent_slice=parent_slice
     )
+
+
+@pytest.mark.parametrize(
+    "app",
+    [{"GUEST_TOKEN_JWT_SECRET": "test-guest-secret-change-me"}],
+    indirect=True,
+)
+def test_init_rejects_default_guest_secret_when_embedded_enabled(
+    app_context: None,
+    mocker: MockerFixture,
+) -> None:
+    """Reject the default GUEST_TOKEN_JWT_SECRET when EMBEDDED_SUPERSET is on."""
+    mocker.patch(
+        "superset.extensions.feature_flag_manager.is_feature_enabled",
+        side_effect=lambda flag: flag == "EMBEDDED_SUPERSET",
+    )
+    with pytest.raises(
+        ValueError,
+        match="GUEST_TOKEN_JWT_SECRET must be changed from the default value",
+    ):
+        SupersetSecurityManager(appbuilder)
+
+
+@pytest.mark.parametrize(
+    "app",
+    [{"GUEST_TOKEN_JWT_SECRET": "my-custom-secure-secret"}],
+    indirect=True,
+)
+def test_init_allows_custom_guest_secret_when_embedded_enabled(
+    app_context: None,
+    mocker: MockerFixture,
+) -> None:
+    """A non-default GUEST_TOKEN_JWT_SECRET should be accepted."""
+    mocker.patch(
+        "superset.extensions.feature_flag_manager.is_feature_enabled",
+        side_effect=lambda flag: flag == "EMBEDDED_SUPERSET",
+    )
+    sm = SupersetSecurityManager(appbuilder)
+    assert sm
+
+
+@pytest.mark.parametrize(
+    "app",
+    [{"GUEST_TOKEN_JWT_SECRET": "test-guest-secret-change-me"}],
+    indirect=True,
+)
+def test_init_allows_default_guest_secret_when_embedded_disabled(
+    app_context: None,
+    mocker: MockerFixture,
+) -> None:
+    """The default secret is acceptable when EMBEDDED_SUPERSET is disabled."""
+    mocker.patch(
+        "superset.extensions.feature_flag_manager.is_feature_enabled",
+        return_value=False,
+    )
+    sm = SupersetSecurityManager(appbuilder)
+    assert sm
