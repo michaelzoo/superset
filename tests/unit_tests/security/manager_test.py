@@ -668,6 +668,68 @@ def test_query_context_modified_native_filter(mocker: MockerFixture) -> None:
     assert not query_context_modified(query_context)
 
 
+def test_query_context_modified_guest_no_slice(mocker: MockerFixture) -> None:
+    """
+    Test that a guest user submitting a QueryContext without a slice_id
+    is treated as modified, preventing bypass of column/metric restrictions
+    via the Drill-to-Detail path.
+    """
+    mocker.patch.object(
+        SupersetSecurityManager,
+        "is_guest_user",
+        return_value=True,
+    )
+
+    query_context = mocker.MagicMock()
+    query_context.slice_ = None
+    query_context.form_data = {
+        "datasource": "1__table",
+        "viz_type": "table",
+        "dashboardId": 1,
+    }
+
+    assert query_context_modified(query_context)
+
+
+def test_query_context_modified_guest_native_filter(mocker: MockerFixture) -> None:
+    """
+    Test that a guest user submitting a native filter request (no form_data)
+    is still allowed through (returns False), as native filters are legitimate.
+    """
+    mocker.patch.object(
+        SupersetSecurityManager,
+        "is_guest_user",
+        return_value=True,
+    )
+
+    query_context = mocker.MagicMock()
+    query_context.slice_ = None
+    query_context.form_data = None
+
+    assert not query_context_modified(query_context)
+
+
+def test_query_context_modified_non_guest_no_slice(mocker: MockerFixture) -> None:
+    """
+    Test that a non-guest user submitting a QueryContext without a slice_id
+    still returns False (original behavior preserved).
+    """
+    mocker.patch.object(
+        SupersetSecurityManager,
+        "is_guest_user",
+        return_value=False,
+    )
+
+    query_context = mocker.MagicMock()
+    query_context.slice_ = None
+    query_context.form_data = {
+        "datasource": "1__table",
+        "viz_type": "table",
+    }
+
+    assert not query_context_modified(query_context)
+
+
 def test_query_context_modified_mixed_chart(mocker: MockerFixture) -> None:
     """
     Test the `query_context_modified` function for a mixed chart request.

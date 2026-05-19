@@ -354,6 +354,11 @@ def query_context_modified(query_context: "QueryContext") -> bool:
 
     # native filter requests
     if form_data is None or stored_chart is None:
+        # Guest users MUST reference a stored chart; treat any query
+        # without a stored chart as modified to prevent bypassing
+        # column/metric restrictions via the Drill-to-Detail path.
+        if SupersetSecurityManager.is_guest_user():
+            return stored_chart is None and form_data is not None
         return False
 
     # cannot request a different chart
