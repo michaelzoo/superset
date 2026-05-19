@@ -363,6 +363,26 @@ def test_url_param_query() -> None:
         assert cache.url_param("foo") == "bar"
 
 
+def test_url_param_escaped_query() -> None:
+    """
+    Test the ``url_param`` macro escapes values from request.args
+    using the dialect-specific literal_processor to prevent SQL injection.
+    """
+    with current_app.test_request_context(query_string={"foo": "O'Brien"}):
+        cache = ExtraCache(dialect=dialect())
+        assert cache.url_param("foo") == "O''Brien"
+
+
+def test_url_param_unescaped_query() -> None:
+    """
+    Test the ``url_param`` macro returns unescaped values from request.args
+    when escape_result is False.
+    """
+    with current_app.test_request_context(query_string={"foo": "O'Brien"}):
+        cache = ExtraCache(dialect=dialect())
+        assert cache.url_param("foo", escape_result=False) == "O'Brien"
+
+
 def test_url_param_default() -> None:
     """
     Test the ``url_param`` macro with a default value.
