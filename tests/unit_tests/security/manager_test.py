@@ -668,6 +668,93 @@ def test_query_context_modified_native_filter(mocker: MockerFixture) -> None:
     assert not query_context_modified(query_context)
 
 
+def test_raise_for_access_guest_no_slice_with_columns(
+    mocker: MockerFixture,
+    app_context: None,
+) -> None:
+    """
+    Test that a guest user submitting a QueryContext without a stored chart
+    but with columns in the queries is blocked, preventing bypass of
+    column/metric restrictions via the Drill-to-Detail path.
+    """
+    sm = SupersetSecurityManager(appbuilder)
+    mocker.patch.object(sm, "is_guest_user", return_value=True)
+    mocker.patch.object(sm, "can_access", return_value=True)
+
+    query_context = mocker.MagicMock()
+    query_context.slice_ = None
+    query_context.form_data = {
+        "datasource": "1__table",
+        "viz_type": "table",
+        "dashboardId": 1,
+    }
+    query_context.queries = [
+        QueryObject(columns=["secret_col"], metrics=["count"]),
+    ]
+
+    with pytest.raises(SupersetSecurityException):
+        sm.raise_for_access(query_context=query_context)
+
+
+def test_raise_for_access_guest_no_slice_with_metrics_only(
+    mocker: MockerFixture,
+    app_context: None,
+) -> None:
+    """
+    Test that a guest user submitting a QueryContext without a stored chart
+    but with only metrics (no columns) is allowed, since metrics-only queries
+    are used by legitimate internal operations like the samples endpoint.
+    """
+    sm = SupersetSecurityManager(appbuilder)
+    mocker.patch.object(sm, "is_guest_user", return_value=True)
+    mocker.patch.object(sm, "can_access", return_value=True)
+
+    query_context = mocker.MagicMock()
+    query_context.slice_ = None
+    query_context.form_data = {
+        "datasource": "1__table",
+        "viz_type": "table",
+        "dashboardId": 1,
+    }
+    query_context.queries = [
+        QueryObject(
+            metrics=[
+                {
+                    "expressionType": "SQL",
+                    "sqlExpression": "COUNT(*)",
+                    "label": "cnt",
+                }
+            ],
+        ),
+    ]
+
+    sm.raise_for_access(query_context=query_context)
+
+
+def test_raise_for_access_guest_no_slice_empty_queries(
+    mocker: MockerFixture,
+    app_context: None,
+) -> None:
+    """
+    Test that a guest user submitting a QueryContext without a stored chart
+    and with empty queries (legitimate drill-to-detail) is allowed.
+    """
+    sm = SupersetSecurityManager(appbuilder)
+    mocker.patch.object(sm, "is_guest_user", return_value=True)
+    mocker.patch.object(sm, "can_access", return_value=True)
+
+    query_context = mocker.MagicMock()
+    query_context.slice_ = None
+    query_context.form_data = {
+        "datasource": "1__table",
+        "viz_type": "table",
+        "dashboardId": 1,
+    }
+    query_context.queries = []
+
+    sm.raise_for_access(query_context=query_context)
+
+
 def test_query_context_modified_mixed_chart(mocker: MockerFixture) -> None:
     """
     Test the `query_context_modified` function for a mixed chart request.

@@ -2995,6 +2995,29 @@ class SupersetSecurityManager(  # pylint: disable=too-many-public-methods
                 )
             )
 
+        # Guest users without a stored chart reference who submit queries
+        # with explicit columns bypass the query_context_modified check
+        # above (which returns False when slice_ is None). Block these
+        # requests to prevent arbitrary column access via the
+        # Drill-to-Detail path.
+        if (
+            query_context
+            and self.is_guest_user()
+            and query_context.slice_ is None
+            and query_context.form_data is not None
+            and any(getattr(query, "columns", None) for query in query_context.queries)
+        ):
+            raise SupersetSecurityException(
+                SupersetError(
+                    error_type=SupersetErrorType.DASHBOARD_SECURITY_ACCESS_ERROR,
+                    message=_(
+                        "Guest user cannot query specific columns "
+                        "without a valid chart reference"
+                    ),
+                    level=ErrorLevel.WARNING,
+                )
+            )
+
         if datasource or query_context or viz:
             form_data = None
 
