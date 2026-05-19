@@ -14,6 +14,7 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+import ipaddress
 import platform
 import socket
 import subprocess
@@ -68,3 +69,37 @@ def is_host_up(host: str) -> bool:
         return False
 
     return output == 0
+
+
+def is_safe_hostname(hostname: str) -> bool:
+    """
+    Validate that a hostname does not resolve to a private, reserved,
+    or loopback IP address. This prevents SSRF attacks where an attacker
+    could use a hostname that resolves to internal network addresses.
+
+    :param hostname: The hostname to validate
+    :return: True if the hostname resolves to a public IP, False otherwise
+    """
+    try:
+        addr_infos = socket.getaddrinfo(hostname, None)
+    except socket.gaierror:
+        return False
+
+    for _, _, _, _, sockaddr in addr_infos:
+        ip_str = sockaddr[0]
+        try:
+            ip_addr = ipaddress.ip_address(ip_str)
+        except ValueError:
+            return False
+
+        if (
+            ip_addr.is_private
+            or ip_addr.is_loopback
+            or ip_addr.is_reserved
+            or ip_addr.is_link_local
+            or ip_addr.is_multicast
+            or ip_addr.is_unspecified
+        ):
+            return False
+
+    return True
