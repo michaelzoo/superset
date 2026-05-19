@@ -696,13 +696,14 @@ def test_raise_for_access_guest_no_slice_with_columns(
         sm.raise_for_access(query_context=query_context)
 
 
-def test_raise_for_access_guest_no_slice_with_metrics(
+def test_raise_for_access_guest_no_slice_with_metrics_only(
     mocker: MockerFixture,
     app_context: None,
 ) -> None:
     """
     Test that a guest user submitting a QueryContext without a stored chart
-    but with metrics in the queries is blocked.
+    but with only metrics (no columns) is allowed, since metrics-only queries
+    are used by legitimate internal operations like the samples endpoint.
     """
     sm = SupersetSecurityManager(appbuilder)
     mocker.patch.object(sm, "is_guest_user", return_value=True)
@@ -727,8 +728,7 @@ def test_raise_for_access_guest_no_slice_with_metrics(
         ),
     ]
 
-    with pytest.raises(SupersetSecurityException):
-        sm.raise_for_access(query_context=query_context)
+    sm.raise_for_access(query_context=query_context)
 
 
 def test_raise_for_access_guest_no_slice_empty_queries(
