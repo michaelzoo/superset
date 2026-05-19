@@ -668,17 +668,18 @@ def test_query_context_modified_native_filter(mocker: MockerFixture) -> None:
     assert not query_context_modified(query_context)
 
 
-def test_query_context_modified_guest_no_slice(mocker: MockerFixture) -> None:
+def test_raise_for_access_guest_no_slice_with_columns(
+    mocker: MockerFixture,
+    app_context: None,
+) -> None:
     """
-    Test that a guest user submitting a QueryContext without a slice_id
-    is treated as modified, preventing bypass of column/metric restrictions
-    via the Drill-to-Detail path.
+    Test that a guest user submitting a QueryContext without a stored chart
+    but with columns in the queries is blocked, preventing bypass of
+    column/metric restrictions via the Drill-to-Detail path.
     """
-    mocker.patch.object(
-        SupersetSecurityManager,
-        "is_guest_user",
-        return_value=True,
-    )
+    sm = SupersetSecurityManager(appbuilder)
+    mocker.patch.object(sm, "is_guest_user", return_value=True)
+    mocker.patch.object(sm, "can_access", return_value=True)
 
     query_context = mocker.MagicMock()
     query_context.slice_ = None
@@ -687,47 +688,71 @@ def test_query_context_modified_guest_no_slice(mocker: MockerFixture) -> None:
         "viz_type": "table",
         "dashboardId": 1,
     }
+    query_context.queries = [
+        QueryObject(columns=["secret_col"], metrics=["count"]),
+    ]
 
-    assert query_context_modified(query_context)
+    with pytest.raises(SupersetSecurityException):
+        sm.raise_for_access(query_context=query_context)
 
 
-def test_query_context_modified_guest_native_filter(mocker: MockerFixture) -> None:
+def test_raise_for_access_guest_no_slice_with_metrics(
+    mocker: MockerFixture,
+    app_context: None,
+) -> None:
     """
-    Test that a guest user submitting a native filter request (no form_data)
-    is still allowed through (returns False), as native filters are legitimate.
+    Test that a guest user submitting a QueryContext without a stored chart
+    but with metrics in the queries is blocked.
     """
-    mocker.patch.object(
-        SupersetSecurityManager,
-        "is_guest_user",
-        return_value=True,
-    )
-
-    query_context = mocker.MagicMock()
-    query_context.slice_ = None
-    query_context.form_data = None
-
-    assert not query_context_modified(query_context)
-
-
-def test_query_context_modified_non_guest_no_slice(mocker: MockerFixture) -> None:
-    """
-    Test that a non-guest user submitting a QueryContext without a slice_id
-    still returns False (original behavior preserved).
-    """
-    mocker.patch.object(
-        SupersetSecurityManager,
-        "is_guest_user",
-        return_value=False,
-    )
+    sm = SupersetSecurityManager(appbuilder)
+    mocker.patch.object(sm, "is_guest_user", return_value=True)
+    mocker.patch.object(sm, "can_access", return_value=True)
 
     query_context = mocker.MagicMock()
     query_context.slice_ = None
     query_context.form_data = {
         "datasource": "1__table",
         "viz_type": "table",
+        "dashboardId": 1,
     }
+    query_context.queries = [
+        QueryObject(
+            metrics=[
+                {
+                    "expressionType": "SQL",
+                    "sqlExpression": "COUNT(*)",
+                    "label": "cnt",
+                }
+            ],
+        ),
+    ]
 
-    assert not query_context_modified(query_context)
+    with pytest.raises(SupersetSecurityException):
+        sm.raise_for_access(query_context=query_context)
+
+
+def test_raise_for_access_guest_no_slice_empty_queries(
+    mocker: MockerFixture,
+    app_context: None,
+) -> None:
+    """
+    Test that a guest user submitting a QueryContext without a stored chart
+    and with empty queries (legitimate drill-to-detail) is allowed.
+    """
+    sm = SupersetSecurityManager(appbuilder)
+    mocker.patch.object(sm, "is_guest_user", return_value=True)
+    mocker.patch.object(sm, "can_access", return_value=True)
+
+    query_context = mocker.MagicMock()
+    query_context.slice_ = None
+    query_context.form_data = {
+        "datasource": "1__table",
+        "viz_type": "table",
+        "dashboardId": 1,
+    }
+    query_context.queries = []
+
+    sm.raise_for_access(query_context=query_context)
 
 
 def test_query_context_modified_mixed_chart(mocker: MockerFixture) -> None:
