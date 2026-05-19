@@ -669,14 +669,26 @@ class SupersetAppInitializer:  # pylint: disable=too-many-public-methods
 
     def check_guest_token_secret(self) -> None:
         """Reject the known insecure GUEST_TOKEN_JWT_SECRET when
-        the EMBEDDED_SUPERSET feature flag is enabled."""
+        the EMBEDDED_SUPERSET feature flag is enabled.
+
+        Validates that the secret:
+        1. Is not None or the known insecure default value.
+        2. Meets a minimum length of 32 characters.
+        """
+        min_secret_length = 32
         secret = self.config.get("GUEST_TOKEN_JWT_SECRET")
         embedded_enabled = self.config.get("DEFAULT_FEATURE_FLAGS", {}).get(
             "EMBEDDED_SUPERSET", False
-        )
+        ) or self.config.get("FEATURE_FLAGS", {}).get("EMBEDDED_SUPERSET", False)
 
         if not embedded_enabled:
             return
+
+        is_safe_environment = (
+            self.superset_app.debug
+            or self.superset_app.config.get("TESTING")
+            or is_test()
+        )
 
         if secret is None or secret == INSECURE_GUEST_TOKEN_JWT_SECRET:
             logger.error(
@@ -685,11 +697,18 @@ class SupersetAppInitializer:  # pylint: disable=too-many-public-methods
                 "Set a strong, unique secret via the GUEST_TOKEN_JWT_SECRET "
                 "environment variable or in superset_config.py."
             )
-            if not (
-                self.superset_app.debug
-                or self.superset_app.config.get("TESTING")
-                or is_test()
-            ):
+            if not is_safe_environment:
+                sys.exit(1)
+            return
+
+        if len(secret) < min_secret_length:
+            logger.error(
+                "EMBEDDED_SUPERSET is enabled but GUEST_TOKEN_JWT_SECRET is too "
+                "short (minimum %d characters required). "
+                "Use a strong random value, e.g.: openssl rand -base64 42",
+                min_secret_length,
+            )
+            if not is_safe_environment:
                 sys.exit(1)
 
     def configure_session(self) -> None:

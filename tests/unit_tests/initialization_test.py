@@ -237,7 +237,7 @@ class TestCheckGuestTokenSecret:
         mock_app.debug = False
         mock_app.config = {
             "TESTING": False,
-            "GUEST_TOKEN_JWT_SECRET": "my-strong-random-secret-value",
+            "GUEST_TOKEN_JWT_SECRET": "a-very-strong-random-secret-value!!",
             "DEFAULT_FEATURE_FLAGS": {"EMBEDDED_SUPERSET": True},
         }
         app_initializer = SupersetAppInitializer(mock_app)
@@ -282,6 +282,84 @@ class TestCheckGuestTokenSecret:
 
         with (
             patch("superset.initialization.is_test", return_value=True),
+            patch("superset.initialization.sys.exit") as mock_exit,
+        ):
+            app_initializer.check_guest_token_secret()
+
+        mock_exit.assert_not_called()
+
+    def test_short_secret_with_embedded_enabled_exits(self):
+        """Startup must reject a secret shorter than 32 characters."""
+        mock_app = MagicMock()
+        mock_app.debug = False
+        mock_app.config = {
+            "TESTING": False,
+            "GUEST_TOKEN_JWT_SECRET": "too-short-secret",
+            "DEFAULT_FEATURE_FLAGS": {"EMBEDDED_SUPERSET": True},
+        }
+        app_initializer = SupersetAppInitializer(mock_app)
+
+        with (
+            patch("superset.initialization.is_test", return_value=False),
+            patch("superset.initialization.sys.exit") as mock_exit,
+        ):
+            app_initializer.check_guest_token_secret()
+
+        mock_exit.assert_called_once_with(1)
+
+    def test_short_secret_in_debug_mode_does_not_exit(self):
+        """In debug mode the minimum-length check should not exit."""
+        mock_app = MagicMock()
+        mock_app.debug = True
+        mock_app.config = {
+            "TESTING": False,
+            "GUEST_TOKEN_JWT_SECRET": "too-short-secret",
+            "DEFAULT_FEATURE_FLAGS": {"EMBEDDED_SUPERSET": True},
+        }
+        app_initializer = SupersetAppInitializer(mock_app)
+
+        with (
+            patch("superset.initialization.is_test", return_value=False),
+            patch("superset.initialization.sys.exit") as mock_exit,
+        ):
+            app_initializer.check_guest_token_secret()
+
+        mock_exit.assert_not_called()
+
+    def test_feature_flags_dict_enables_check(self):
+        """EMBEDDED_SUPERSET in FEATURE_FLAGS (not just DEFAULT_FEATURE_FLAGS)
+        must also trigger the validation."""
+        mock_app = MagicMock()
+        mock_app.debug = False
+        mock_app.config = {
+            "TESTING": False,
+            "GUEST_TOKEN_JWT_SECRET": None,
+            "DEFAULT_FEATURE_FLAGS": {},
+            "FEATURE_FLAGS": {"EMBEDDED_SUPERSET": True},
+        }
+        app_initializer = SupersetAppInitializer(mock_app)
+
+        with (
+            patch("superset.initialization.is_test", return_value=False),
+            patch("superset.initialization.sys.exit") as mock_exit,
+        ):
+            app_initializer.check_guest_token_secret()
+
+        mock_exit.assert_called_once_with(1)
+
+    def test_exactly_32_char_secret_passes(self):
+        """A secret that is exactly 32 characters should pass."""
+        mock_app = MagicMock()
+        mock_app.debug = False
+        mock_app.config = {
+            "TESTING": False,
+            "GUEST_TOKEN_JWT_SECRET": "a" * 32,
+            "DEFAULT_FEATURE_FLAGS": {"EMBEDDED_SUPERSET": True},
+        }
+        app_initializer = SupersetAppInitializer(mock_app)
+
+        with (
+            patch("superset.initialization.is_test", return_value=False),
             patch("superset.initialization.sys.exit") as mock_exit,
         ):
             app_initializer.check_guest_token_secret()
